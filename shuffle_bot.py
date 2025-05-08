@@ -198,7 +198,7 @@ class ShuffleBot:
             while True:
                 now = datetime.datetime.now().time()
                 # Run only between 08:00 and 22:00
-                if datetime.time(8, 0) <= now <= datetime.time(23, 0):
+                if datetime.time(8, 0) <= now <= datetime.time(22, 0):
                     try:
                         matches = self.load_api_data()
                         new_matches = [m for m in matches if m["name"] not in last_matches]
