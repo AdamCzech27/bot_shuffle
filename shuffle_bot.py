@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 class ShuffleBot:
     def __init__(self):
-        self.url = "https://fifa-api.tesseractparadox.com/odin/predictions"
+        self.url = "add here html"
         self.driver = webdriver.Firefox()
         self.match_name = None
         self.prediction_line = None
