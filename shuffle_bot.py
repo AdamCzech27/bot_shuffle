@@ -3,6 +3,9 @@ import time
 import random
 import datetime
 import logging
+import csv
+import os
+
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -256,6 +259,26 @@ class ShuffleBot:
         # návrat na homepage nebo jinou rozumnou akci
         self.driver.get(self.url_web)
         print("Cekam na dalsi sazku...")       
+
+    def log_bet_to_csv(self, bet_value):
+        filename = "placed_bets.csv"
+        file_exists = os.path.isfile(filename)
+
+        with open(filename, mode='a', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            if not file_exists:
+                # Zapiš hlavičku, pokud soubor neexistuje
+                writer.writerow(["Timestamp", "Match", "What", "Line", "Odds", "ROI", "Bet Value"])
+
+            writer.writerow([
+                datetime.datetime.now().isoformat(),
+                self.match_name,
+                self.what,
+                self.prediction_line,
+                self.prediction_odds,
+                round(self.roi, 2),
+                bet_value
+            ])
     
     def close(self):
         if self.driver:
@@ -264,7 +287,7 @@ class ShuffleBot:
     def run(self):
         try:
             self.login_and_wait()
-            last_matches = None
+            last_matches = []
 
             while True:
                 now = datetime.datetime.now().time()
@@ -290,26 +313,33 @@ class ShuffleBot:
 
                                     self.go_to_match_bet()
                                     self.find_a_bet()
-                                    if self.roi > 10:
-                                        self.place_bet(bet_value=0.0003)
-                                    else:
-                                        self.place_bet(bet_value=0.0001)                                        
 
-                                    last_matches = match["name"]
+                                    if self.roi > 10:
+                                        bet_value = 0.0003
+                                    else:
+                                        bet_value = 0.0001
+
+                                    self.place_bet(bet_value=bet_value)
+                                    self.log_bet_to_csv(bet_value=bet_value)
+
+                                    time.sleep(random.randint(2, 5))
+
                                 except Exception as match_error:
                                     logger.error(f"Chyba při zpracování zápasu '{match['name']}': {match_error}", exc_info=True)
+
+                            last_matches = new_matches  
                         else:
                             logger.debug("Žádné nové zápasy.")
 
                     except Exception as loop_error:
                         logger.error(f"Chyba během načítání nebo zpracování zápasů: {loop_error}", exc_info=True)
 
-                    time.sleep(10)
                 else:
                     logger.info("Mimo provozních hodin (08:00–23:00). Ukončuji běh.")
                     break
         finally:
             self.close()
+
 
 # Spuštění
 if __name__ == "__main__":
