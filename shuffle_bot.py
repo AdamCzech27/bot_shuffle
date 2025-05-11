@@ -189,7 +189,7 @@ class ShuffleBot:
 
                         xpath = (
                             f"//div[contains(@class, '{over_under_class_name}')]"
-                            f"//p[text()='{self.prediction_line}']"
+                            f"//button[p[1][text()='{self.prediction_line}'] and p[2]//span[text()='{self.prediction_odds}']]"
                         )
 
                         button = WebDriverWait(self.driver, 10).until(
