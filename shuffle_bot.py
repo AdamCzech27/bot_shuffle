@@ -295,7 +295,7 @@ class ShuffleBot:
                                     else:
                                         self.place_bet(bet_value=0.0001)                                        
 
-                                    last_matches = new_matches
+                                    last_matches = match_name
                                 except Exception as match_error:
                                     logger.error(f"Chyba při zpracování zápasu '{match['name']}': {match_error}", exc_info=True)
                         else:
