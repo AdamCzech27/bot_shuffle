@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ShuffleBot:
     def __init__(self):
-        self.url = "add_here_api"
+        self.url = "https://fifa-api.tesseractparadox.com/odin/predictions"
         self.url_web = "https://shuffle.com/sports/efootball/efootball-international"
         self.driver = webdriver.Firefox()
         self.match_name = None
@@ -67,6 +67,7 @@ class ShuffleBot:
                     parsed_matches = []
                     for match in matches:
                         parsed = {
+                            "id": match['id'],
                             "name": match['name'],
                             "line": match['prediction']['line'],
                             "odd": match['prediction']['odd'],
@@ -300,8 +301,8 @@ class ShuffleBot:
                         matches = self.load_api_data()
                         new_matches = [m for m in matches if m["id"] not in last_matches]
 
-                        if new_matches == last_matches:
-                            time.sleep(20)
+                        if not new_matches:
+                            time.sleep(25)
 
                         if new_matches:
                             logger.info("Zjištěny nové zápasy, načítám data...")
@@ -335,7 +336,7 @@ class ShuffleBot:
                                 except Exception as match_error:
                                     logger.error(f"Chyba při zpracování zápasu '{match['name']}': {match_error}", exc_info=True)
 
-                            last_matches.append(self.match_id)  
+                            last_matches.add(self.match_id)  
                         else:
                             logger.debug("Žádné nové zápasy.")
 
