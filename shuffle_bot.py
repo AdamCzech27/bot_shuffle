@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ShuffleBot:
     def __init__(self):
-        self.url = "add_here_api"
+        self.url = "https://fifa-api.tesseractparadox.com/odin/predictions"
         self.url_web = "https://shuffle.com/sports/efootball/efootball-international"
         self.driver = webdriver.Firefox()
         self.match_name = None
@@ -136,11 +136,15 @@ class ShuffleBot:
             except Exception as e:
                 logger.error(f"Chyba při načítání detailu zápasu ({href}): {e}", exc_info=True)
                 
-    #def find_account_balance(self):
-    #    
-    #    wait = WebDriverWait(self.driver, 10)
-    #    balance_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='balance']")))
-    #    balance_value = float(balance_element.text)
+    def count_bet_value(self, additional_bankroll, number_of_units, max_stake):
+        
+        wait = WebDriverWait(self.driver, 10)
+        balance_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='balance']")))
+        balance_str = balance_element.text.strip()
+        balance = float(balance_str.replace('$', '').replace(',', ''))
+        bet_value = round(((balance_value + additional_bankroll) / number_of_units) * 2) / 2
+
+        return min(bet_value, max_stake)
         
     def go_to_match_bet(self):
         
@@ -308,7 +312,8 @@ class ShuffleBot:
                             logger.info("Zjištěny nové zápasy, načítám data...")
                             self.results = {}
                             self.collect_matches()
-
+                            
+                            bet_value = self.count_bet_value(additional_bankroll = 60 , number_of_units = 100, max_stake = 40)
                             for match in matches:
                                 try:
                                     self.match_name = match["name"]
@@ -322,11 +327,6 @@ class ShuffleBot:
 
                                     self.go_to_match_bet()
                                     self.find_a_bet()
-
-                                    if self.roi > 10:
-                                        bet_value = 0.0003
-                                    else:
-                                        bet_value = 0.0001
 
                                     self.place_bet(bet_value=bet_value)
                                     self.log_bet_to_csv(bet_value=bet_value)
