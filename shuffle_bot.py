@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ShuffleBot:
     def __init__(self):
-        self.url = "https://fifa-api.tesseractparadox.com/odin/predictions"
+        self.url = "add_here_api"
         self.url_web = "https://shuffle.com/sports/efootball/efootball-international"
         self.driver = webdriver.Firefox()
         self.match_name = None
