@@ -336,7 +336,7 @@ class ShuffleBot:
                                 except Exception as match_error:
                                     logger.error(f"Chyba při zpracování zápasu '{match['name']}': {match_error}", exc_info=True)
 
-                            last_matches.add(self.match_id)  
+                                last_matches.add(self.match_id)  
                         else:
                             logger.debug("Žádné nové zápasy.")
 
