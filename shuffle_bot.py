@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ShuffleBot:
     def __init__(self):
-        self.url = "add_here_fifa_api"
+        self.url = "add_here_api"
         self.url_web = "https://shuffle.com/sports/efootball/efootball-international"
         self.driver = webdriver.Firefox()
         self.match_name = None
@@ -30,6 +30,7 @@ class ShuffleBot:
         self.prediction_odds = None
         self.roi = None
         self.what = None
+        self.match_id = None
         self.results = {}
 
             
@@ -201,7 +202,7 @@ class ShuffleBot:
 
                         try:
                             button.click()
-                            logger.info(f"Tlačítko kliknuto pro hodnotu: {self.prediction_line}")
+                            logger.info(f"Tlačítko kliknuto pro hodnotu: {self.prediction_line} @ {self.prediction_odds}")
                         except Exception:
                             self.driver.execute_script("arguments[0].click();", button)
                             logger.warning("Fallback: kliknutí provedeno přes JavaScript.")
@@ -263,17 +264,18 @@ class ShuffleBot:
         print("Cekam na dalsi sazku...")       
 
     def log_bet_to_csv(self, bet_value):
-        filename = "placed_bets.csv"
+        filename = "shuffle_bets.csv"
         file_exists = os.path.isfile(filename)
 
         with open(filename, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             if not file_exists:
                 # Zapiš hlavičku, pokud soubor neexistuje
-                writer.writerow(["Timestamp", "Match", "What", "Line", "Odds", "ROI", "Bet Value"])
+                writer.writerow(["Timestamp", "id", "Match", "What", "Line", "Odds", "ROI", "Bet Value"])
 
             writer.writerow([
                 datetime.datetime.now().isoformat(),
+                self.match_id,
                 self.match_name,
                 self.what,
                 self.prediction_line,
@@ -289,19 +291,19 @@ class ShuffleBot:
     def run(self):
         try:
             self.login_and_wait()
-            last_matches = []
+            last_matches = set()
 
             while True:
                 now = datetime.datetime.now().time()
                 if datetime.time(8, 0) <= now <= datetime.time(23, 0):
                     try:
                         matches = self.load_api_data()
-                        new_matches = [m["name"] for m in matches]
-                        
+                        new_matches = [m for m in matches if m["id"] not in last_matches]
+
                         if new_matches == last_matches:
                             time.sleep(20)
 
-                        if new_matches != last_matches:
+                        if new_matches:
                             logger.info("Zjištěny nové zápasy, načítám data...")
                             self.results = {}
                             self.collect_matches()
@@ -312,6 +314,7 @@ class ShuffleBot:
                                     self.prediction_line = match["line"]
                                     self.roi = match["roi"]
                                     self.prediction_odds = "{:.2f}".format(float(match["odd"]))
+                                    self.match_id = match["id"]
                                     self.what = match["what"]
 
                                     logger.info(f"Nový zápas: {self.match_name}, predikce: {self.what} {self.prediction_line} @ {self.prediction_odds}")
@@ -332,7 +335,7 @@ class ShuffleBot:
                                 except Exception as match_error:
                                     logger.error(f"Chyba při zpracování zápasu '{match['name']}': {match_error}", exc_info=True)
 
-                            last_matches = new_matches  
+                            last_matches.append(self.match_id)  
                         else:
                             logger.debug("Žádné nové zápasy.")
 
