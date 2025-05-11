@@ -57,7 +57,7 @@ class ShuffleBot:
         while True:
             try:
                 logger.debug("Načítání dat z API...")
-                response = requests.get(self.url)
+                response = requests.get(self.url, timeout=5)
                 response.raise_for_status()
                 matches = response.json()
 
@@ -74,6 +74,8 @@ class ShuffleBot:
                         }
                         logger.debug(f"Zpracován zápas: {parsed}")
                         parsed_matches.append(parsed)
+                        
+                    time.sleep(5)
                     return parsed_matches
 
             except requests.RequestException as e:
@@ -295,6 +297,9 @@ class ShuffleBot:
                     try:
                         matches = self.load_api_data()
                         new_matches = [m["name"] for m in matches]
+                        
+                        if new_matches == last_matches:
+                            time.sleep(20)
 
                         if new_matches != last_matches:
                             logger.info("Zjištěny nové zápasy, načítám data...")
