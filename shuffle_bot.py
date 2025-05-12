@@ -5,7 +5,13 @@ import datetime
 import logging
 import csv
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+SHUFFLE_ADDITIONAL_BANKROLL = os.getenv('SHUFFLE_ADDITIONAL_BANKROLL')
+SHUFFLE_NUMBER_OF_UNITS = os.getenv('SHUFFLE_NUMBER_OF_UNITS')
+SHUFFLE_MAX_STAKE = os.getenv('SHUFFLE_MAX_STAKE')
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -136,15 +142,15 @@ class ShuffleBot:
             except Exception as e:
                 logger.error(f"Chyba při načítání detailu zápasu ({href}): {e}", exc_info=True)
                 
-    def count_bet_value(self, additional_bankroll, number_of_units, max_stake):
+    def count_bet_value(self):
         
         wait = WebDriverWait(self.driver, 10)
         balance_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='balance']")))
         balance_str = balance_element.text.strip()
         balance = float(balance_str.replace('$', '').replace(',', ''))
-        bet_value = round(((balance_value + additional_bankroll) / number_of_units) * 2) / 2
+        bet_value = round(((balance + SHUFFLE_ADDITIONAL_BANKROLL) / SHUFFLE_NUMBER_OF_UNITS) * 2) / 2
 
-        return min(bet_value, max_stake)
+        return min(bet_value, SHUFFLE_MAX_STAKE)
         
     def go_to_match_bet(self):
         
@@ -313,7 +319,7 @@ class ShuffleBot:
                             self.results = {}
                             self.collect_matches()
                             
-                            bet_value = self.count_bet_value(additional_bankroll = 60 , number_of_units = 100, max_stake = 40)
+                            bet_value = self.count_bet_value()
                             for match in matches:
                                 try:
                                     self.match_name = match["name"]
