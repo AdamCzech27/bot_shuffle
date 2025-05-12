@@ -9,9 +9,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SHUFFLE_ADDITIONAL_BANKROLL = os.getenv('SHUFFLE_ADDITIONAL_BANKROLL')
-SHUFFLE_NUMBER_OF_UNITS = os.getenv('SHUFFLE_NUMBER_OF_UNITS')
-SHUFFLE_MAX_STAKE = os.getenv('SHUFFLE_MAX_STAKE')
+SHUFFLE_ADDITIONAL_BANKROLL = float(os.getenv('SHUFFLE_ADDITIONAL_BANKROLL'))
+SHUFFLE_NUMBER_OF_UNITS = float(os.getenv('SHUFFLE_NUMBER_OF_UNITS'))
+SHUFFLE_MAX_STAKE = float(os.getenv('SHUFFLE_MAX_STAKE'))
+SHUFFLE_BET_FROM = int(os.getenv('SHUFFLE_BET_FROM'))
+SHUFFLE_BET_TO = int(os.getenv('SHUFFLE_BET_TO'))
+
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -148,7 +151,7 @@ class ShuffleBot:
         balance_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='balance']")))
         balance_str = balance_element.text.strip()
         balance = float(balance_str.replace('$', '').replace(',', ''))
-        bet_value = round(((balance + SHUFFLE_ADDITIONAL_BANKROLL) / SHUFFLE_NUMBER_OF_UNITS) * 2) / 2
+        bet_value = round(((balance + SHUFFLE_ADDITIONAL_BANKROLL) / SHUFFLE_NUMBER_OF_UNITS) / 5) * 5
 
         return min(bet_value, SHUFFLE_MAX_STAKE)
         
@@ -306,7 +309,7 @@ class ShuffleBot:
 
             while True:
                 now = datetime.datetime.now().time()
-                if datetime.time(8, 0) <= now <= datetime.time(23, 0):
+                if datetime.time(SHUFFLE_BET_FROM, 0) <= now <= datetime.time(SHUFFLE_BET_TO, 0):
                     try:
                         matches = self.load_api_data()
                         new_matches = [m for m in matches if m["id"] not in last_matches]
@@ -350,8 +353,7 @@ class ShuffleBot:
                         logger.error(f"Chyba během načítání nebo zpracování zápasů: {loop_error}", exc_info=True)
 
                 else:
-                    logger.info("Mimo provozních hodin (08:00–23:00). Ukončuji běh.")
-                    break
+                    logger.info("Mimo provozních hodin. Nesazim.")
         finally:
             self.close()
 
