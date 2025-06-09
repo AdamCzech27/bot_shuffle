@@ -1,11 +1,11 @@
-import requests
+import os
+import re
+import csv
 import time
 import random
 import datetime
 import logging
-import csv
-import os
-
+import requests
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -13,9 +13,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-# Nastavení loggeru na začátku souboru
+# Nastavení loggeru
 logging.basicConfig(
-    level=logging.INFO,  # nebo DEBUG pro více detailů
+    level=logging.INFO,  # změň na DEBUG pro detailnější logování
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class ShuffleBot:
     def __init__(self):
         self.url = "https://fifa-api.tesseractparadox.com/odin/predictions"
-        self.url_web = "https://shuffle.com/sports/efootball/efootball-international"
+        self.url_web = "https://yonibet.eu/ca/sport?bt-path=%2Fesoccer-137"
         self.driver = webdriver.Firefox()
         self.match_name = None
         self.prediction_line = None
@@ -32,12 +32,20 @@ class ShuffleBot:
         self.what = None
         self.match_id = None
         self.results = {}
+        self.urls = [
+            'https://yonibet.eu/ca/sport',
+            'https://yonibet.eu/ca/games/category/popular',
+            'https://yonibet.eu/ca/play/125837-aviatrix',
+            'https://yonibet.eu/ca/play/130602-jackass-gold-hold-amp-win-buy-bonus',
+            'https://yonibet.eu/ca/sport?bt-path=%2Fcounter-strike-109',
+            'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2538512713961840683',
+            'https://yonibet.eu/ca/sport?bt-path=%2Frugby-league-59',
+            'https://yonibet.eu/ca/sport?bt-path=%2Fbasketball%2Fusa%2Fnba-1669819088278523904'
+        ]
 
-            
     def login_and_wait(self):
-        login_url = self.url_web
-        logger.info(f"Otevírám stránku pro přihlášení: {login_url}")
-        self.driver.get(login_url)
+        logger.info(f"Otevírám stránku pro přihlášení: {self.url_web}")
+        self.driver.get(self.url_web)
 
         delay = random.randint(3, 14)
         logger.debug(f"Čekám náhodně {delay} sekund před ověřením přihlášení...")
@@ -45,19 +53,21 @@ class ShuffleBot:
 
         try:
             WebDriverWait(self.driver, 300).until(
-                EC.presence_of_element_located((By.XPATH, "//span[text()='Wallet']"))
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "span#headerDepositButtonValue.btnDeposit__text.truncate")
+                )
             )
             logger.info("Přihlášení bylo úspěšně rozpoznáno.")
         except Exception as e:
             logger.error(f"Nepodařilo se přihlásit: {e}", exc_info=True)
             self.close()
-            raise  
-    
+            raise
+
     def load_api_data(self):
         logger.info("Čekám na data z API...")
         while True:
             try:
-                logger.debug("Načítání dat z API...")
+                logger.debug("Načítám data z API...")
                 response = requests.get(self.url, timeout=5)
                 response.raise_for_status()
                 matches = response.json()
@@ -73,25 +83,31 @@ class ShuffleBot:
                             "odd": match['prediction']['odd'],
                             "roi": match['prediction']['roi'] * 100,
                             "what": match['prediction']['what'],
-                            "tour": match['prediction']['tournament']
                         }
                         logger.debug(f"Zpracován zápas: {parsed}")
                         parsed_matches.append(parsed)
-                        
+
                     time.sleep(5)
                     return parsed_matches
 
+                else:
+                    x = random.randint(1, 200)
+                    if x > 185:
+                        select_num = random.randint(0, len(self.urls) - 1)
+                        if self.driver.current_url != self.urls[select_num]:
+                            logger.info(f"Přecházím na náhodnou URL: {self.urls[select_num]}")
+                            self.driver.get(self.urls[select_num])
+                    else:
+                        logger.debug("API nevrátilo zápasy, čekám 5 sekund...")
+                        time.sleep(5)
+
             except requests.RequestException as e:
                 logger.error(f"Chyba při načítání dat z API: {e}")
+                time.sleep(5)  # počkej před dalším pokusem
 
-            # Počkej před dalším pokusem
-            time.sleep(10)
-
-    
-    
     def collect_matches(self):
         logger.debug("Čekám na načtení týmů a zápasů...")
-        
+
         try:
             urls = [
                 'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2543590749606391853',
@@ -101,184 +117,176 @@ class ShuffleBot:
 
             for url in urls:
                 try:
-                    logging.info(f"Načítám stránku: {url}")
-                    driver.get(url)
-                    time.sleep(15)
+                    logger.info(f"Načítám stránku: {url}")
+                    self.driver.get(url)
+                    time.sleep(3)
 
                     js_extract_matches = r"""
-                    let shadowHost = document.querySelector('#bt-inner-page');
-                    if (!shadowHost) return null;
-                    let shadowRoot = shadowHost.shadowRoot;
-                    if (!shadowRoot) return null;
+                        let shadowHost = document.querySelector('#bt-inner-page');
+                        if (!shadowHost) return null;
+                        let shadowRoot = shadowHost.shadowRoot;
+                        if (!shadowRoot) return null;
 
-                    let links = shadowRoot.querySelectorAll("a[data-editor-id='eventCardContent']");
-                    let result = {};
+                        let links = shadowRoot.querySelectorAll("a[data-editor-id='eventCardContent']");
+                        let result = {};
 
-                    links.forEach(link => {
-                        let text = link.textContent.trim();
-                        text = text.replace(/\s+/g, ' ');
-                        let match = text.match(/([A-Za-z\s]+?\([A-Za-z]+\))\s*([A-Za-z\s]+?\([A-Za-z]+\))/);
-                        if (match && match.length === 3) {
-                            let team1 = match[1].trim();
-                            let team2 = match[2].trim();
-                            let key = `${team1} vs ${team2}`;
-                            result[key] = link.href;
-                        }
-                    });
-                    return result;
+                        links.forEach(link => {
+                            let text = link.textContent.trim();
+                            text = text.replace(/\s+/g, ' ');
+                            let match = text.match(/([A-Za-z\s]+?\([A-Za-z]+\))\s*([A-Za-z\s]+?\([A-Za-z]+\))/);
+                            if (match && match.length === 3) {
+                                let team1 = match[1].trim();
+                                let team2 = match[2].trim();
+                                let key = `${team1} vs ${team2}`;
+                                result[key] = link.href;
+                            }
+                        });
+                        return result;
                     """
 
-                    matches_dict = driver.execute_script(js_extract_matches)
+                    matches_dict = self.driver.execute_script(js_extract_matches)
                     if matches_dict:
                         self.results.update(matches_dict)
-                        logging.info(f"Načteno {len(matches_dict)} zápasů.")
+                        logger.info(f"Načteno {len(matches_dict)} zápasů.")
                     else:
-                        logging.warning("Žádné zápasy nebyly nalezeny.")
+                        logger.warning("Žádné zápasy nebyly nalezeny.")
                 except Exception as e:
-                    logging.error(f"Chyba při zpracování URL {url}: {str(e)}")
+                    logger.error(f"Chyba při zpracování URL {url}: {str(e)}")
 
         except Exception as main_e:
-            logging.critical(f"Fatální chyba: {str(main_e)}")
+            logger.critical(f"Fatální chyba: {str(main_e)}")
+        print(self.results)
 
-                
     def count_bet_value(self, additional_bankroll, number_of_units, max_stake):
-        
         wait = WebDriverWait(self.driver, 10)
-        balance_element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span[data-testid='balance']")))
+        balance_element = wait.until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "span#headerDepositButtonValue.btnDeposit__text.truncate")
+        ))
+
         balance_str = balance_element.text.strip()
-        balance = float(balance_str.replace('$', '').replace(',', ''))
+        balance_clean = balance_str.replace('€', '').replace(',', '.').strip()
+
+        try:
+            balance = float(balance_clean)
+        except ValueError as ve:
+            logger.error(f"Chybný formát zůstatku: {balance_clean}", exc_info=True)
+            balance = 0.0
+
         bet_value = round(((balance + additional_bankroll) / number_of_units) * 2) / 2
-
         return min(bet_value, max_stake)
-        
-    def go_to_match_bet(self):
-        
-        normalize = lambda s: re.sub(r'\s+', ' ', s.strip())
 
-        logger.info(f"Hledání zápasu: {self.match_name}")
+    def go_to_match_bet(self):
+        normalize = lambda s: re.sub(r'\s+', ' ', s.strip())
+        logger.info(f"Hledám zápas: {self.match_name}")
         match_name = normalize(self.match_name)
 
         for href, text in self.results.items():
             text = normalize(text)
             parts = text.split(' vs ', 1)
-
+            print([text,match_name,swapped_string])
             if len(parts) != 2:
                 logger.error(f"Neplatný formát zápasu: {text}")
                 continue
 
             team_1, team_2 = parts
             swapped_string = f"{team_2} vs {team_1}"
-
+            
             if text == match_name or swapped_string == match_name:
-                logger.info(f"Zápas nalezen: {text}. Pokouším se načíst stránku: {href}")
+                logger.info(f"Zápas nalezen: {text}. Přecházím na stránku: {href}")
                 try:
                     self.driver.get(href)
                     delay = random.randint(3, 14)
-                    logger.debug(f"Náhodné zpoždění {delay} sekund před pokračováním...")
+                    logger.debug(f"Čekám {delay} sekund před pokračováním...")
                     time.sleep(delay)
-                    logger.info("Úspěšně přejito na stránku zápasu.")
+                    logger.info("Úspěšně načtena stránka zápasu.")
                     return
                 except Exception as e:
-                    logger.error(f"Nepodařilo se přejít na stránku zápasu: {e}", exc_info=True)
+                    logger.error(f"Chyba při přechodu na stránku zápasu: {e}", exc_info=True)
                     return
 
-        logger.warning(f"Zápas {self.match_name} nebyl nalezen mezi výsledky.")
+        logger.warning(f"Zápas {self.match_name} nebyl nalezen v seznamu výsledků.")
 
     
     def find_a_bet(self):
-
-        over_under_class_name = (
-            "LadderMarketLayout_teamA__qsCMN" if self.what == 'over' else "LadderMarketLayout_teamB__dH6dD"
-        )
-
         try:
             logger.info(f"Hledám container pro sázku typu '{self.what}'...")
-            container = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, over_under_class_name))
-            )
+            time.sleep(15)
 
-            elements = container.find_elements(By.CLASS_NAME, "SportsBetSelectionButton_eventText__FJ6GL")
-            logger.debug(f"Nalezeno {len(elements)} možností sázek")
+            js_click_over = f"""
+            let shadowHost = document.querySelector('#bt-inner-page');
+            if (!shadowHost) return 'No shadowHost';
 
-            for element in elements:
-                if element.text == str(self.prediction_line):
-                    try:
-                        logger.info(f"Hledám tlačítko pro hodnotu: {self.prediction_line}, kurz: {self.prediction_odds}")
+            let shadowRoot = shadowHost.shadowRoot;
+            if (!shadowRoot) return 'No shadowRoot';
 
-                        xpath = (
-                            f"//div[contains(@class, '{over_under_class_name}')]"
-                            f"//button[p[1][text()='{self.prediction_line}'] and p[2]//span[text()='{self.prediction_odds}']]"
-                        )
+            let markets = shadowRoot.querySelectorAll('[data-editor-id="tableMarketWrapper"]');
+            let logs = [];
 
-                        button = WebDriverWait(self.driver, 10).until(
-                            EC.element_to_be_clickable((By.XPATH, xpath))
-                        )
+            for (let market of markets) {{
+                let outcomes = market.querySelectorAll('[data-editor-id="tableOutcomePlate"]');
+                for (let outcome of outcomes) {{
+                    let nameEl = outcome.querySelector('[data-editor-id="tableOutcomePlateName"]');
 
-                        self.driver.execute_script("arguments[0].scrollIntoView(true);", button)
-                        time.sleep(0.5)
+                    if (nameEl) {{
+                        let nameText = nameEl.textContent.trim().toLowerCase();
+                        logs.push('Nalezen: ' + nameText);
 
-                        try:
-                            button.click()
-                            logger.info(f"Tlačítko kliknuto pro hodnotu: {self.prediction_line} @ {self.prediction_odds}")
-                        except Exception:
-                            self.driver.execute_script("arguments[0].click();", button)
-                            logger.warning("Fallback: kliknutí provedeno přes JavaScript.")
+                        if (nameText.includes('{self.what.lower()} {self.prediction_line}')) {{
+                            outcome.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                            outcome.click();
+                            return '✅ Kliknuto na: ' + nameText;
+                        }}
+                    }}
+                }}
+            }}
+            return '❌ Nenalezen žádný výběr {self.what} {self.prediction_line}.\\n' + logs.join(' | ');
+            """
 
-                        break
-
-                    except Exception as e:
-                        logger.error(f"Chyba při pokusu o kliknutí na tlačítko: {e}", exc_info=True)
+            result = self.driver.execute_script(js_click_over)
+            logger.info(f"Výsledek kliknutí: {result}")
 
         except Exception as e:
-            logger.error("Container nebo tlačítko nenalezeno.", exc_info=True)
+            logger.error("Nepodarilo se kliknout na sazku", exc_info=True)
 
         time.sleep(random.randint(2, 5))
 
     
     def place_bet(self, bet_value):
         try:
-            input_elem = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, '.CurrencyInput_currencyInput__YGw5R input'))
-            )
-            input_elem.clear()
-            try:
-                input_elem.send_keys(str(bet_value))
-                logger.info(f"Zadána částka: {bet_value}")
-            except Exception as e_inner:
-                logger.warning(f"send_keys selhalo pro hodnotu {bet_value}, zkouším JS metodu... ({e_inner})")
-                self.driver.execute_script("arguments[0].value = arguments[1];", input_elem, str(bet_value))
+            js_set_stake_and_place_bet = f"""
+            let shadowHost = document.querySelector('#bt-inner-page');
+            if (!shadowHost) return 'No shadowHost';
+
+            let shadowRoot = shadowHost.shadowRoot;
+            if (!shadowRoot) return 'No shadowRoot';
+
+            // Najdeme input pro sázku
+            let stakeInput = shadowRoot.querySelector('label[data-editor-id="betslipStakeInput"] input');
+            if (!stakeInput) return '❌ Nenalezen input pro sázku';
+
+            // Nastavíme hodnotu sázky (např. 10)
+            stakeInput.value = {str(bet_value)};
+
+            // Vyvoláme událost input, aby to stránka zaregistrovala
+            stakeInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+            // Najdeme tlačítko Place Bet a klikneme na něj
+            let placeBetBtn = shadowRoot.querySelector('[data-editor-id="betslipPlaceBetButton"]');
+            if (!placeBetBtn) return '❌ Nenalezeno tlačítko Place Bet';
+
+            placeBetBtn.click();
+            return '✅ Sázka nastavena na 10 a kliknuto na Place Bet';
+            """
+
+            self.driver.execute_script(js_set_stake_and_place_bet)
+            
         except (TimeoutException, NoSuchElementException) as e_outer:
             logger.error(f"Prvek pro zadání částky nebyl nalezen nebo není interaktivní: {e_outer}", exc_info=True)
             logger.debug("Výstup HTML (zkrácen):\n" + self.driver.page_source[:2000])
             return  # místo continue
 
         time.sleep(random.randint(2, 5))
-
-        # klikni na tlačítko "Bet"
-        try:
-            bet_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = 'place bets']"))
-            )
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", bet_button)
-            time.sleep(random.randint(2, 5))
-            bet_button.click()
-            logger.info("Sázka úspěšně podána.")
-
-            # potvrzení kliknutí na "Done"
-            done_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') = 'done']"))
-            )
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", done_button)
-            time.sleep(random.randint(2, 5))
-            done_button.click()
-            logger.info("Potvrzení sázky úspěšně dokončeno.")
-        except Exception as e:
-            logger.error(f"Chyba při klikání na 'Bet' nebo 'Done': {e}", exc_info=True)
-            return  # místo continue
-
-        # návrat na homepage nebo jinou rozumnou akci
-        self.driver.get(self.url_web)
-        print("Cekam na dalsi sazku...")       
+     
 
     def log_bet_to_csv(self, bet_value):
         filename = "shuffle_bets.csv"
@@ -311,8 +319,9 @@ class ShuffleBot:
             last_matches = set()
 
             while True:
+                #<= datetime.time(24, 0)
                 now = datetime.datetime.now().time()
-                if datetime.time(7, 0) <= now <= datetime.time(23, 0):
+                if datetime.time(7, 0) <= now:
                     try:
                         matches = self.load_api_data()
                         new_matches = [m for m in matches if m["id"] not in last_matches]
@@ -366,105 +375,3 @@ class ShuffleBot:
 if __name__ == "__main__":
     bot = ShuffleBot()
     bot.run()        
-#####
-
-
-
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-import json
-import time
-
-options = webdriver.FirefoxOptions()
-driver = webdriver.Firefox(options=options)
-
-driver.get("https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min%2Fogc-nice-junior-paris-saint-germain-bony-2543858739027513344")
-
-# počkej na načtení (lepší je explicitní wait, ale tady pro příklad sleep)
-time.sleep(15)  # Počkej na načtení stránky a dynamického obsahu
-
-
-js_click_over = """
-let shadowHost = document.querySelector('#bt-inner-page');
-if (!shadowHost) return 'No shadowHost';
-
-let shadowRoot = shadowHost.shadowRoot;
-if (!shadowRoot) return 'No shadowRoot';
-
-let markets = shadowRoot.querySelectorAll('[data-editor-id="tableMarketWrapper"]');
-
-for (let market of markets) {
-    let outcomes = market.querySelectorAll('[data-editor-id="tableOutcomePlate"]');
-    for (let outcome of outcomes) {
-        let nameEl = outcome.querySelector('[data-editor-id="tableOutcomePlateName"] span');
-        if (nameEl && nameEl.textContent.trim().toLowerCase().includes('over')) {
-            outcome.click();
-            return 'Clicked on: ' + nameEl.textContent.trim();
-        }
-    }
-}
-return 'No element with "over" found';
-"""
-
-result = driver.execute_script(js_click_over)
-print(result)
-
-
-
-
-######
-
-
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-import json
-import time
-
-options = webdriver.FirefoxOptions()
-driver = webdriver.Firefox(options=options)
-
-driver.get("https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min%2Fogc-nice-junior-paris-saint-germain-bony-2543858739027513344")
-
-# počkej na načtení (lepší je explicitní wait, ale tady pro příklad sleep)
-time.sleep(15)  # Počkej na načtení stránky a dynamického obsahu
-
-
-js_code = """
-let shadowHost = document.querySelector('#bt-inner-page');
-if (!shadowHost) return null;
-
-let shadowRoot = shadowHost.shadowRoot;
-if (!shadowRoot) return null;
-
-let markets = shadowRoot.querySelectorAll('[data-editor-id="tableMarketWrapper"]');
-let result = [];
-
-markets.forEach(market => {
-    let outcomes = market.querySelectorAll('[data-editor-id="tableOutcomePlate"]');
-    let match = [];
-
-    outcomes.forEach(outcome => {
-        let nameEl = outcome.querySelector('[data-editor-id="tableOutcomePlateName"] span');
-        let oddEl = outcome.querySelector('span.bt469');
-        if (nameEl && oddEl) {
-            match.push({
-                'team': nameEl.textContent.trim(),
-                'odd': oddEl.textContent.trim()
-            });
-        }
-    });
-
-    if (match.length >= 2) {
-        result.push(match);
-    }
-});
-
-return JSON.stringify(result);
-"""
-
-data_json = driver.execute_script(js_code)
-data = json.loads(data_json) if data_json else []
-
-print(data)
-
-driver.quit()
