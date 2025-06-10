@@ -269,31 +269,21 @@ class ShuffleBot:
     
     def place_bet(self, bet_value):
         try:
-
-            js_set_stake_and_place_bet = f"""
+            js_click_place_bet = """
                 let shadowHost = document.querySelector('#bt-inner-page');
                 if (!shadowHost) return 'No shadowHost';
 
                 let shadowRoot = shadowHost.shadowRoot;
                 if (!shadowRoot) return 'No shadowRoot';
 
-                let stakeInput = shadowRoot.querySelector('label[data-editor-id="betslipStakeInput"] input');
-                if (!stakeInput) return '❌ Nenalezen input pro sázku';
-
-                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                nativeInputValueSetter.call(stakeInput, '{bet_value}');
-                stakeInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                stakeInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                stakeInput.dispatchEvent(new Event('blur', {{ bubbles: true }}));
-
                 let placeBetBtn = shadowRoot.querySelector('[data-editor-id="betslipPlaceBetButton"]');
                 if (!placeBetBtn) return '❌ Nenalezeno tlačítko Place Bet';
 
                 placeBetBtn.click();
-                return '✅ Sázka nastavena na {bet_value} a kliknuto na Place Bet';
+                return '✅ Kliknuto na Place Bet';
             """
 
-            result = self.driver.execute_script(js_set_stake_and_place_bet)
+            result = self.driver.execute_script(js_click_place_bet)
             print(result)
 
         except (TimeoutException, NoSuchElementException) as e_outer:
