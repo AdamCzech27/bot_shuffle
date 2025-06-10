@@ -38,7 +38,6 @@ class ShuffleBot:
             'https://yonibet.eu/ca/play/125837-aviatrix',
             'https://yonibet.eu/ca/play/130602-jackass-gold-hold-amp-win-buy-bonus',
             'https://yonibet.eu/ca/sport?bt-path=%2Fcounter-strike-109',
-            'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2538512713961840683',
             'https://yonibet.eu/ca/sport?bt-path=%2Frugby-league-59',
             'https://yonibet.eu/ca/sport?bt-path=%2Fbasketball%2Fusa%2Fnba-1669819088278523904'
         ]
@@ -119,7 +118,7 @@ class ShuffleBot:
                 try:
                     logger.info(f"Načítám stránku: {url}")
                     self.driver.get(url)
-                    time.sleep(3)
+                    time.sleep(10)
 
                     js_extract_matches = r"""
                         let shadowHost = document.querySelector('#bt-inner-page');
@@ -131,16 +130,22 @@ class ShuffleBot:
                         let result = {};
 
                         links.forEach(link => {
-                            let text = link.textContent.trim();
-                            text = text.replace(/\s+/g, ' ');
-                            let match = text.match(/([A-Za-z\s]+?\([A-Za-z]+\))\s*([A-Za-z\s]+?\([A-Za-z]+\))/);
-                            if (match && match.length === 3) {
-                                let team1 = match[1].trim();
-                                let team2 = match[2].trim();
-                                let key = `${team1} vs ${team2}`;
-                                result[key] = link.href;
+                            let text = link.textContent.trim().replace(/\s+/g, ' ');
+
+                            let href = link.getAttribute("data-href") || link.getAttribute("href");
+
+                            if (href) {
+                                // Ujisti se, že máme správnou absolutní URL ve formátu s ?bt-path=
+                                if (href.startsWith('/')) {
+                                    href = `https://yonibet.eu/ca/sport?bt-path=${href}`;
+                                } else if (!href.startsWith('http')) {
+                                    href = new URL(href, window.location.href).href;
+                                }
+
+                                result[text] = href;
                             }
                         });
+
                         return result;
                     """
 
@@ -155,7 +160,6 @@ class ShuffleBot:
 
         except Exception as main_e:
             logger.critical(f"Fatální chyba: {str(main_e)}")
-        print(self.results)
 
     def count_bet_value(self, additional_bankroll, number_of_units, max_stake):
         wait = WebDriverWait(self.driver, 10)
@@ -176,23 +180,34 @@ class ShuffleBot:
         return min(bet_value, max_stake)
 
     def go_to_match_bet(self):
-        normalize = lambda s: re.sub(r'\s+', ' ', s.strip())
-        logger.info(f"Hledám zápas: {self.match_name}")
-        match_name = normalize(self.match_name)
 
-        for href, text in self.results.items():
-            text = normalize(text)
-            parts = text.split(' vs ', 1)
-            print([text,match_name,swapped_string])
+        logger.info(f"Hledám zápas: {self.match_name}")
+
+        for text,href in self.results.items():
+            # Vyčištění textu
+            cleaned_text = re.sub(r'\b(1st|2nd) half\b', '', text, flags=re.IGNORECASE)          # Odeber 1st/2nd half
+            cleaned_text = re.sub(r'Avui,\s*\d{2}:\d{2}', '', cleaned_text)                       # Odeber "Avui, HH:MM"
+            cleaned_text = re.sub(r'\b\d{2}\b$', '', cleaned_text.strip())                        # Odeber skóre jako "42" na konci
+            cleaned_text = cleaned_text.strip()                                                   # Odstraň nadbytečné mezery
+
+            # Vlož " vs " mezi dva týmy, pokud není
+            match = re.search(r'([A-Za-z\s]+ \([A-Za-z]+\))([A-Za-z\s]+ \([A-Za-z]+\))', cleaned_text)
+            if match:
+                team1 = match.group(1).strip()
+                team2 = match.group(2).strip()
+                cleaned_text = f"{team1} vs {team2}"
+
+            parts = cleaned_text.split(' vs ', 1)
+
             if len(parts) != 2:
-                logger.error(f"Neplatný formát zápasu: {text}")
+                logger.error(f"Neplatný formát zápasu: {cleaned_text}")
                 continue
 
             team_1, team_2 = parts
             swapped_string = f"{team_2} vs {team_1}"
-            
-            if text == match_name or swapped_string == match_name:
-                logger.info(f"Zápas nalezen: {text}. Přecházím na stránku: {href}")
+
+            if cleaned_text == self.match_name or swapped_string == self.match_name:
+                logger.info(f"Zápas nalezen: {cleaned_text}. Přecházím na stránku: {href}")
                 try:
                     self.driver.get(href)
                     delay = random.randint(3, 14)
@@ -205,6 +220,7 @@ class ShuffleBot:
                     return
 
         logger.warning(f"Zápas {self.match_name} nebyl nalezen v seznamu výsledků.")
+
 
     
     def find_a_bet(self):
@@ -253,33 +269,33 @@ class ShuffleBot:
     
     def place_bet(self, bet_value):
         try:
+
             js_set_stake_and_place_bet = f"""
-            let shadowHost = document.querySelector('#bt-inner-page');
-            if (!shadowHost) return 'No shadowHost';
+                let shadowHost = document.querySelector('#bt-inner-page');
+                if (!shadowHost) return 'No shadowHost';
 
-            let shadowRoot = shadowHost.shadowRoot;
-            if (!shadowRoot) return 'No shadowRoot';
+                let shadowRoot = shadowHost.shadowRoot;
+                if (!shadowRoot) return 'No shadowRoot';
 
-            // Najdeme input pro sázku
-            let stakeInput = shadowRoot.querySelector('label[data-editor-id="betslipStakeInput"] input');
-            if (!stakeInput) return '❌ Nenalezen input pro sázku';
+                let stakeInput = shadowRoot.querySelector('label[data-editor-id="betslipStakeInput"] input');
+                if (!stakeInput) return '❌ Nenalezen input pro sázku';
 
-            // Nastavíme hodnotu sázky (např. 10)
-            stakeInput.value = {str(bet_value)};
+                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeInputValueSetter.call(stakeInput, '{bet_value}');
+                stakeInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                stakeInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                stakeInput.dispatchEvent(new Event('blur', {{ bubbles: true }}));
 
-            // Vyvoláme událost input, aby to stránka zaregistrovala
-            stakeInput.dispatchEvent(new Event('input', { bubbles: true }));
+                let placeBetBtn = shadowRoot.querySelector('[data-editor-id="betslipPlaceBetButton"]');
+                if (!placeBetBtn) return '❌ Nenalezeno tlačítko Place Bet';
 
-            // Najdeme tlačítko Place Bet a klikneme na něj
-            let placeBetBtn = shadowRoot.querySelector('[data-editor-id="betslipPlaceBetButton"]');
-            if (!placeBetBtn) return '❌ Nenalezeno tlačítko Place Bet';
-
-            placeBetBtn.click();
-            return '✅ Sázka nastavena na 10 a kliknuto na Place Bet';
+                placeBetBtn.click();
+                return '✅ Sázka nastavena na {bet_value} a kliknuto na Place Bet';
             """
 
-            self.driver.execute_script(js_set_stake_and_place_bet)
-            
+            result = self.driver.execute_script(js_set_stake_and_place_bet)
+            print(result)
+
         except (TimeoutException, NoSuchElementException) as e_outer:
             logger.error(f"Prvek pro zadání částky nebyl nalezen nebo není interaktivní: {e_outer}", exc_info=True)
             logger.debug("Výstup HTML (zkrácen):\n" + self.driver.page_source[:2000])
