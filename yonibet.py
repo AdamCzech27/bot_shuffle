@@ -6,6 +6,16 @@ import random
 import datetime
 import logging
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+YONIBET_ADDITIONAL_BANKROLL = float(os.getenv('YONIBET_ADDITIONAL_BANKROLL'))
+YONIBET_NUMBER_OF_UNITS = float(os.getenv('YONIBET_NUMBER_OF_UNITS'))
+YONIBET_MAX_STAKE = int(os.getenv('YONIBET_MAX_STAKE'))
+YONIBET_BET_FROM = int(os.getenv('YONIBET_BET_FROM'))
+YONIBET_BET_TO = int(os.getenv('YONIBET_BET_TO'))
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -20,7 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class ShuffleBot:
+class YoniBet:
     def __init__(self):
         self.url = "https://fifa-api.tesseractparadox.com/odin/predictions"
         self.url_web = "https://yonibet.eu/ca/sport?bt-path=%2Fesoccer-137"
@@ -161,7 +171,7 @@ class ShuffleBot:
         except Exception as main_e:
             logger.critical(f"Fatální chyba: {str(main_e)}")
 
-    def count_bet_value(self, additional_bankroll, number_of_units, max_stake):
+    def count_bet_value(self):
         wait = WebDriverWait(self.driver, 10)
         balance_element = wait.until(EC.presence_of_element_located(
             (By.CSS_SELECTOR, "span#headerDepositButtonValue.btnDeposit__text.truncate")
@@ -176,8 +186,8 @@ class ShuffleBot:
             logger.error(f"Chybný formát zůstatku: {balance_clean}", exc_info=True)
             balance = 0.0
 
-        bet_value = round(((balance + additional_bankroll) / number_of_units) * 2) / 2
-        return min(bet_value, max_stake)
+        bet_value = round(((balance + YONIBET_ADDITIONAL_BANKROLL) / YONIBET_NUMBER_OF_UNITS) / 5) * 5
+        return min(bet_value, YONIBET_MAX_STAKE)
 
     def go_to_match_bet(self):
 
@@ -337,7 +347,7 @@ class ShuffleBot:
             while True:
                 #<= datetime.time(24, 0)
                 now = datetime.datetime.now().time()
-                if datetime.time(7, 0) <= now:
+                if datetime.time(YONIBET_BET_FROM, 0) <= now <= datetime.time(YONIBET_BET_TO, 0):
                     try:
                         matches = self.load_api_data()
                         new_matches = [m for m in matches if m["id"] not in last_matches]
@@ -350,7 +360,7 @@ class ShuffleBot:
                             self.results = {}
                             self.collect_matches()
                             
-                            bet_value = self.count_bet_value(additional_bankroll = 200 , number_of_units = 20, max_stake = 80)
+                            bet_value = self.count_bet_value()
                             for match in matches:
                                 try:
                                     self.match_name = match["name"]
@@ -389,5 +399,5 @@ class ShuffleBot:
 
 # Spuštění
 if __name__ == "__main__":
-    bot = ShuffleBot()
+    bot = YoniBet()
     bot.run()        
