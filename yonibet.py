@@ -119,9 +119,9 @@ class YoniBet:
 
         try:
             urls = [
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2543590749606391853',
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valkyrie-cup-2x4-min-2543607148261290024',
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-3-2x4-min-2543608703408549900',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2546133458934181906',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valkyrie-cup-2x4-min-2546144164022718492',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-3-2x4-min-2546147463316774918',
             ]
 
             for url in urls:
