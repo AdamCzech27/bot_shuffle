@@ -119,11 +119,11 @@ class YoniBet:
 
         try:
             urls = [
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2543590749606391853',
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valkyrie-cup-2x4-min-2543607148261290024',
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-3-2x4-min-2543608703408549900',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2546133458934181906',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valkyrie-cup-2x4-min-2546144164022718492',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-3-2x4-min-2546147463316774918',
             ]
-
+            
             for url in urls:
                 try:
                     logger.info(f"Načítám stránku: {url}")
@@ -201,7 +201,7 @@ class YoniBet:
             cleaned_text = cleaned_text.strip()                                                   # Odstraň nadbytečné mezery
 
             # Vlož " vs " mezi dva týmy, pokud není
-            match = re.search(r'([A-Za-z\s]+ \([A-Za-z]+\))([A-Za-z\s]+ \([A-Za-z]+\))', cleaned_text)
+            match = re.search(r'([A-Za-z\s]+ \([A-Za-z0-9]+\))\s*([A-Za-z\s]+ \([A-Za-z0-9]+\))', cleaned_text)
             if match:
                 team1 = match.group(1).strip()
                 team2 = match.group(2).strip()
@@ -230,7 +230,6 @@ class YoniBet:
                     return
 
         logger.warning(f"Zápas {self.match_name} nebyl nalezen v seznamu výsledků.")
-
 
     
     def find_a_bet(self):
