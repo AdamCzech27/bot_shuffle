@@ -119,11 +119,11 @@ class YoniBet:
 
         try:
             urls = [
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2546133458934181906',
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valkyrie-cup-2x4-min-2546144164022718492',
-                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-3-2x4-min-2546147463316774918',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-2x4-min-2543590749606391853',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valkyrie-cup-2x4-min-2543607148261290024',
+                'https://yonibet.eu/ca/sport?bt-path=%2Fesoccer%2Fefootball%2Fa--valhalla-cup-3-2x4-min-2543608703408549900',
             ]
-            
+
             for url in urls:
                 try:
                     logger.info(f"Načítám stránku: {url}")
@@ -201,7 +201,7 @@ class YoniBet:
             cleaned_text = cleaned_text.strip()                                                   # Odstraň nadbytečné mezery
 
             # Vlož " vs " mezi dva týmy, pokud není
-            match = re.search(r'([A-Za-z\s]+ \([A-Za-z0-9]+\))\s*([A-Za-z\s]+ \([A-Za-z0-9]+\))', cleaned_text)
+            match = re.search(r'([A-Za-z\s]+ \([A-Za-z]+\))([A-Za-z\s]+ \([A-Za-z]+\))', cleaned_text)
             if match:
                 team1 = match.group(1).strip()
                 team2 = match.group(2).strip()
@@ -231,8 +231,9 @@ class YoniBet:
 
         logger.warning(f"Zápas {self.match_name} nebyl nalezen v seznamu výsledků.")
 
+
     
-        def find_a_bet(self):
+    def find_a_bet(self):
         try:
             logger.info(f"Hledám container pro sázku typu '{self.what}'...")
             time.sleep(15)
@@ -277,67 +278,41 @@ class YoniBet:
 
     
     def place_bet(self, bet_value):
-        time.sleep(10)
         try:
-            js = f"""
-                    (async () => {{
-                        let shadowHost = document.querySelector('#bt-inner-page');
-                        if (!shadowHost) return '❌ No shadowHost';
 
-                        let shadowRoot = shadowHost.shadowRoot;
-                        if (!shadowRoot) return '❌ No shadowRoot';
+            js_set_stake_and_place_bet = f"""
+                let shadowHost = document.querySelector('#bt-inner-page');
+                if (!shadowHost) return 'No shadowHost';
 
-                        let stakeInput = shadowRoot.querySelector('label[data-editor-id="betslipStakeInput"] input');
-                        if (!stakeInput) return '❌ stakeInput nenalezen';
+                let shadowRoot = shadowHost.shadowRoot;
+                if (!shadowRoot) return 'No shadowRoot';
 
-                        // Nastavení stake
-                        stakeInput.focus();
-                        stakeInput.value = '';
-                        stakeInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                let stakeInput = shadowRoot.querySelector('label[data-editor-id="betslipStakeInput"] input');
+                if (!stakeInput) return '❌ Nenalezen input pro sázku';
 
-                        let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                        nativeInputValueSetter.call(stakeInput, '{bet_value}');
+                let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeInputValueSetter.call(stakeInput, '{bet_value}');
+                stakeInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                stakeInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                stakeInput.dispatchEvent(new Event('blur', {{ bubbles: true }}));
 
-                        stakeInput.dispatchEvent(new KeyboardEvent('keydown', {{ bubbles: true }}));
-                        stakeInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        stakeInput.dispatchEvent(new KeyboardEvent('keyup', {{ bubbles: true }}));
-                        stakeInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        stakeInput.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+                let placeBetBtn = shadowRoot.querySelector('[data-editor-id="betslipPlaceBetButton"]');
+                if (!placeBetBtn) return '❌ Nenalezeno tlačítko Place Bet';
 
-                        // Čekej na aktivaci tlačítka
-                        let maxWait = 5000; // max 5 sekund čekání
-                        let interval = 100;
-                        let waited = 0;
-                        let placeBetBtn = null;
-
-                        while (waited < maxWait) {{
-                            placeBetBtn = shadowRoot.querySelector('[data-editor-id="betslipPlaceBetButton"]');
-                            if (placeBetBtn && !placeBetBtn.disabled) {{
-                                break;
-                            }}
-                            await new Promise(resolve => setTimeout(resolve, interval));
-                            waited += interval;
-                        }}
-
-                        if (!placeBetBtn) return '❌ Place Bet tlačítko nenalezeno';
-                        if (placeBetBtn.disabled) return '❌ Place Bet tlačítko je stále neaktivní';
-
-                        // Klikni na tlačítko
-                        placeBetBtn.click();
-                        return `✅ Sázka nastavena na {bet_value} a Place Bet kliknuto`;
-                    }})();
+                placeBetBtn.click();
+                return '✅ Sázka nastavena na {bet_value} a kliknuto na Place Bet';
             """
-            result = self.driver.execute_script(js)
-            logger.info(f"Výsledek kliknutí: {result}")
 
+            result = self.driver.execute_script(js_set_stake_and_place_bet)
+            print(result)
 
         except (TimeoutException, NoSuchElementException) as e_outer:
             logger.error(f"Prvek pro zadání částky nebyl nalezen nebo není interaktivní: {e_outer}", exc_info=True)
             logger.debug("Výstup HTML (zkrácen):\n" + self.driver.page_source[:2000])
-            return
+            return  # místo continue
 
         time.sleep(random.randint(2, 5))
-
+     
 
     def log_bet_to_csv(self, bet_value):
         filename = "shuffle_bets.csv"
@@ -372,7 +347,7 @@ class YoniBet:
             while True:
                 #<= datetime.time(24, 0)
                 now = datetime.datetime.now().time()
-                if datetime.time(7, 0) <= now:
+                if datetime.time(YONIBET_BET_FROM, 0) <= now <= datetime.time(YONIBET_BET_TO, 0):
                     try:
                         matches = self.load_api_data()
                         new_matches = [m for m in matches if m["id"] not in last_matches]
@@ -385,9 +360,7 @@ class YoniBet:
                             self.results = {}
                             self.collect_matches()
                             
-                            
-                            bet_value = self.count_bet_value(additional_bankroll = 200 , number_of_units = 20, max_stake = 80)
-                            logger.info(f"Hodnota sazky {bet_value}")
+                            bet_value = self.count_bet_value()
                             for match in matches:
                                 try:
                                     self.match_name = match["name"]
@@ -426,5 +399,5 @@ class YoniBet:
 
 # Spuštění
 if __name__ == "__main__":
-    bot = ShuffleBot()
+    bot = YoniBet()
     bot.run()        
