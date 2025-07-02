@@ -103,7 +103,6 @@ class BetsIo:
         logger.debug("Čekám na načtení týmů a zápasů...")
 
         try:
-            time.sleep(10)
             urls = [
                 'https://www.bets.io/en/sports/rsoccer/valkyrie-cup-2025-week-27-l-109971292',
                 'https://www.bets.io/en/sports/rsoccer/valhalla-cup-3-2025-week-27-l-109971304',
@@ -114,7 +113,7 @@ class BetsIo:
                 try:
                     logger.info(f"Načítám stránku: {url}")
                     self.driver.get(url)
-                    time.sleep(2) 
+                    time.sleep(10) 
 
                     iframe = WebDriverWait(self.driver, 20).until(
                         EC.presence_of_element_located((By.TAG_NAME, "iframe"))
@@ -171,7 +170,13 @@ class BetsIo:
 
         bet_value = (balance + additional_bankroll) / number_of_units
         logger.info(f"Hodnota sázky: {bet_value}")
-        return min(bet_value, max_stake)
+        
+        # Formátování bez vědecké notace, s 9 desetinnými místy
+        formatted_bet_value = f"{bet_value:.9f}"
+
+        logger.info(f"Hodnota sázky: {formatted_bet_value}")
+
+        return min(formatted_bet_value, max_stake)
 
 
 
@@ -201,79 +206,115 @@ class BetsIo:
     def find_a_bet(self):
         
         logger.info(f"Hledám container pro sázku typu '{self.what}'...")
+
         try:
             time.sleep(5)
-            self.driver.switch_to.default_content()
-            
-            # Počkej, až bude tlačítko klikatelné all
-            iframe = WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.XPATH, '//iframe[contains(@src, "sport.bets.io/en")]'))
-            )
-            driver.switch_to.frame(iframe)
             wait = WebDriverWait(self.driver, 20)
-            button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-test-id='all']")))
-            button.click()
 
+            # Přepnutí zpět na hlavní stránku - pro jistotu
             self.driver.switch_to.default_content()
 
-            # Vypiš všechny iframe a src
-            iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+            # Čekání na tlačítko 'All' a kliknutí
+            button_all = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-test-id='all']")))
+            button_all.click()
+            logger.info("Kliknuto na záložku 'All'.")
 
-            # Přepni do iframe se src obsahující sport.bets.io/en
-            for iframe in iframes:
-                src = iframe.get_attribute('src')
-                if src and 'sport.bets.io/en' in src:
-                    self.driver.switch_to.frame(iframe)
-                    break
-                    
-
+            # Čekání na načtení tabulky sázek
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.sb-MarketTable")))
 
+            # Vyhledání všech sázek podle názvu marketu
             markets = self.driver.find_elements(By.XPATH, "//span[contains(text(), 'Match Total Goals')]")
+            found = False
 
             for market_name in markets:
-
                 container = market_name.find_element(By.XPATH, "./ancestor::div[contains(@class,'sb-MarketTable')]")
                 buttons = container.find_elements(By.CSS_SELECTOR, "button.sb-Outcome")
+
                 for btn in buttons:
                     label = btn.find_element(By.CSS_SELECTOR, "span.sb-Outcome-label").get_attribute("title")
                     odd = btn.find_element(By.CSS_SELECTOR, "div.sb-Outcome-odds").text
 
-                    if label.lower() == self.what and str(self.prediction_line) in market_name.text and odd == str(self.prediction_odds):
-                        btn.click()
+                    if label == self.what and str(self.prediction_line) in market_name.text and odd == str(self.prediction_odds):
+                        logger.info(f"Nalezena správná sázka '{label}' s kurzem {odd}.")
+
+                        # Počkej na zmizení toastu
+                        toast_hidden = False
+                        try:
+                            WebDriverWait(self.driver, 10).until_not(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, ".Toastify__toast-container"))
+                            )
+                            toast_hidden = True
+                        except TimeoutException:
+                            logger.warning("Toast nezmizel, pokusím se o kliknutí skrze JavaScript.")
+
+                        # Pokud toast zmizel, klasické kliknutí
+                        if toast_hidden:
+                            try:
+                                btn.click()
+                                logger.info("Kliknutí na sázku proběhlo klasicky.")
+                            except ElementClickInterceptedException:
+                                logger.warning("Tlačítko překryto, používám JavaScriptové kliknutí.")
+                                self.driver.execute_script("arguments[0].click();", btn)
+                        else:
+                            # Toast nezmizel - rovnou JavaScriptové kliknutí
+                            try:
+                                self.driver.execute_script("arguments[0].click();", btn)
+                                logger.info("Kliknutí skrze JavaScript proběhlo.")
+                            except Exception:
+                                logger.error("Nepodařilo se kliknout na sázku ani přes JavaScript.", exc_info=True)
+                                return
+
+                        found = True
                         break
 
-            self.driver.switch_to.default_content()
-        except Exception as e:
-            logger.error("Nepodarilo se kliknout na sazku", exc_info=True)
-    
+                if found:
+                    break
+
+            if not found:
+                logger.warning("Požadovaná sázka nenalezena.")
+
+        except Exception:
+            logger.error("Nepodařilo se dokončit vyhledání a kliknutí na sázku.", exc_info=True)
+
+
+
     def place_bet(self, bet_value):
-        time.sleep(10)
-        
-        driver.switch_to.default_content()  # pokud je potřeba
+        self.driver.switch_to.default_content()
+        wait = WebDriverWait(self.driver, 30)
 
-        # Přepnout do správného iframe podle src
-        iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        for iframe in iframes:
-            src = iframe.get_attribute('src')
-            if src and 'sport.bets.io/en' in src:
-                driver.switch_to.frame(iframe)
-                break
+        try:
+            # Vyplnění stake inputu
+            stake_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-test-id='bet-stake-input']")))
+            self.driver.execute_script("""
+                arguments[0].focus();
+                arguments[0].value = arguments[1];
+                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+            """, stake_input, str(bet_value))
+            time.sleep(0.5)  # drobná prodleva na zpracování inputu
 
-        wait = WebDriverWait(driver, 15)
+            # Vyhledání tlačítka Place Bet
+            place_bet_button = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "button[data-test-id='place-bet-button']")))
 
-        # Najdi input pro sázku a nastav hodnotu na 0.0001
-        stake_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-test-id='bet-stake-input']")))
-        driver.execute_script(f"""
-            arguments[0].value = {str(bet_value)};
-            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-        """, stake_input)
+            # Ověření, že tlačítko není disabled
+            is_disabled = place_bet_button.get_attribute("disabled")
+            if is_disabled:
+                logger.error("Tlačítko Place Bet je deaktivované. Sázka se neprovedla.")
+                return
 
-        # Počkej, až bude tlačítko Place Bet klikatelné, a klikni na něj
-        place_bet_button = wait.until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-test-id='place-bet-button']"))
-        )
-        place_bet_button.click()
+            place_bet_button.click()
+            logger.info("Tlačítko Place Bet bylo stisknuto.")
+            time.sleep(0.5)
+
+            # Kliknutí na Clear tlačítko
+            clear_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[title="Clear"]')))
+            clear_button.click()
+
+            logger.info("Sázka úspěšně zadána a potvrzena.")
+        except TimeoutException:
+            logger.error("Nepodařilo se dokončit sázku - input nebo tlačítko nenalezeno.")
+        except Exception as e:
+            logger.error("Neočekávaná chyba při zadávání sázky.", exc_info=True)
 
 
     def log_bet_to_csv(self, bet_value):
