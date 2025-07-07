@@ -97,16 +97,16 @@ class BetsIo:
 
             except requests.RequestException as e:
                 logger.error(f"Chyba při načítání dat z API: {e}")
-                time.sleep(5)  # počkej před dalším pokusem
+            time.sleep(10)  # počkej před dalším pokusem
 
     def collect_matches(self):
         logger.debug("Čekám na načtení týmů a zápasů...")
 
         try:
             urls = [
-                'https://www.bets.io/en/sports/rsoccer/valkyrie-cup-2025-week-27-l-109971292',
-                'https://www.bets.io/en/sports/rsoccer/valhalla-cup-3-2025-week-27-l-109971304',
-                'https://www.bets.io/en/sports/rsoccer/valhalla-cup-2025-week-27-l-109971256',
+                'https://www.bets.io/en/sports/rsoccer/valhalla-cup-2025-week-28-l-109972190',
+                'https://www.bets.io/en/sports/rsoccer/valhalla-cup-3-2025-week-28-l-109972250',
+                'https://www.bets.io/en/sports/rsoccer/valkyrie-cup-2025-week-28-l-109972238',
             ]
 
             for url in urls:
@@ -169,14 +169,11 @@ class BetsIo:
             # return None
 
         bet_value = (balance + additional_bankroll) / number_of_units
-        logger.info(f"Hodnota sázky: {bet_value}")
         
-        # Formátování bez vědecké notace, s 9 desetinnými místy
-        formatted_bet_value = f"{bet_value:.9f}"
-
+        formatted_bet_value = f"{bet_value:.6f}"
         logger.info(f"Hodnota sázky: {formatted_bet_value}")
 
-        return min(formatted_bet_value, max_stake)
+        return formatted_bet_value
 
 
 
@@ -283,34 +280,53 @@ class BetsIo:
         wait = WebDriverWait(self.driver, 30)
 
         try:
-            # Vyplnění stake inputu
-            stake_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[data-test-id='bet-stake-input']")))
+            stake_input = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[data-test-id='bet-stake-input']")))
+
+            current_value = stake_input.get_attribute('value')
+            for _ in current_value:
+                stake_input.send_keys(Keys.BACKSPACE)
+                time.sleep(0.3)
+
+            time.sleep(0.3)
+
+            for c in str(bet_value):
+                stake_input.send_keys(c)
+                time.sleep(0.1)
+
             self.driver.execute_script("""
-                arguments[0].focus();
-                arguments[0].value = arguments[1];
-                arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-                arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
-            """, stake_input, str(bet_value))
-            time.sleep(0.5)  # drobná prodleva na zpracování inputu
+                let el = arguments[0];
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+                el.blur();
+            """, stake_input)
 
-            # Vyhledání tlačítka Place Bet
-            place_bet_button = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "button[data-test-id='place-bet-button']")))
-
-            # Ověření, že tlačítko není disabled
-            is_disabled = place_bet_button.get_attribute("disabled")
-            if is_disabled:
-                logger.error("Tlačítko Place Bet je deaktivované. Sázka se neprovedla.")
-                return
-
-            place_bet_button.click()
-            logger.info("Tlačítko Place Bet bylo stisknuto.")
             time.sleep(0.5)
 
-            # Kliknutí na Clear tlačítko
+            place_bet_button = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "button[data-test-id='place-bet-button']")))
+            wait.until(lambda d: place_bet_button.get_attribute("disabled") is None)
+
+            self.driver.execute_script("arguments[0].click();", place_bet_button)
+            logger.info("Tlačítko Place Bet bylo stisknuto (JS klik).")
+
+            # Počkej na zmizení potvrzovacího toastu, pokud tam je
+            try:
+                WebDriverWait(self.driver, 10).until_not(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".Toastify__toast-container"))
+                )
+                logger.info("Potvrzovací toast zmizel.")
+            except TimeoutException:
+                logger.warning("Toast nezmizel, pokračuji dál.")
+
+            time.sleep(0.5)
+
+            # Vyhledání tlačítka Clear
             clear_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[title="Clear"]')))
-            clear_button.click()
+            self.driver.execute_script("arguments[0].click();", clear_button)
+            logger.info("Tlačítko Clear bylo stisknuto (JS klik).")
 
             logger.info("Sázka úspěšně zadána a potvrzena.")
+
         except TimeoutException:
             logger.error("Nepodařilo se dokončit sázku - input nebo tlačítko nenalezeno.")
         except Exception as e:
