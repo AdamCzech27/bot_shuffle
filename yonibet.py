@@ -112,7 +112,7 @@ class YoniBet:
 
             except requests.RequestException as e:
                 logger.error(f"Chyba při načítání dat z API: {e}")
-                time.sleep(5)  # počkej před dalším pokusem
+            time.sleep(5)  # počkej před dalším pokusem
 
     def collect_matches(self):
         logger.debug("Čekám na načtení týmů a zápasů...")
